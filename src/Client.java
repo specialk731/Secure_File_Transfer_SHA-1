@@ -46,7 +46,7 @@ public class Client {
 		byte[] tmp, fileBytes;
 		
 		try {
-			sock = new Socket(args[0], Integer.parseInt(args[1]));
+			sock = new Socket(args[1], Integer.parseInt(args[2]));
 			ois = new ObjectInputStream(sock.getInputStream());
 			oos = new ObjectOutputStream(sock.getOutputStream());
 			
