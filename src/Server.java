@@ -35,22 +35,22 @@ class Server_Thread extends Thread {
 	Socket sock = null;
 	ObjectInputStream ois;
 	ObjectOutputStream oos;
-	byte[] key = {	Byte.parseByte("11001101"), // 1st 8 bits of key
-			Byte.parseByte("01111001"), // 2nd 8 bits of key
-			Byte.parseByte("00001010"), // 3rd
-			Byte.parseByte("01000100"), // 4th
-			Byte.parseByte("10001110"), // 5th
-			Byte.parseByte("10001111"), // 6th
-			Byte.parseByte("11110010"), // 7th
-			Byte.parseByte("01101101"), // 8th
-			Byte.parseByte("01010010"), // 9th
-			Byte.parseByte("00001011"), // 10th
-			Byte.parseByte("11110011"), // 11th
-			Byte.parseByte("00111111"), // 12th
-			Byte.parseByte("11001111"), // 13th
-			Byte.parseByte("01000001"), // 14th
-			Byte.parseByte("01111000"), // 15th
-			Byte.parseByte("10001010"), // 16th
+	byte[] key = {	(byte) Integer.parseInt("11001101", 2), // 1st 8 bits of key
+					(byte) Integer.parseInt("01111001", 2), // 2nd 8 bits of key
+					(byte) Integer.parseInt("00001010", 2), // 3rd
+					(byte) Integer.parseInt("01000100", 2), // 4th
+					(byte) Integer.parseInt("10001110", 2), // 5th
+					(byte) Integer.parseInt("10001111", 2), // 6th
+					(byte) Integer.parseInt("11110010", 2), // 7th
+					(byte) Integer.parseInt("01101101", 2), // 8th
+					(byte) Integer.parseInt("01010010", 2), // 9th
+					(byte) Integer.parseInt("00001011", 2), // 10th
+					(byte) Integer.parseInt("11110011", 2), // 11th
+					(byte) Integer.parseInt("00111111", 2), // 12th
+					(byte) Integer.parseInt("11001111", 2), // 13th
+					(byte) Integer.parseInt("01000001", 2), // 14th
+					(byte) Integer.parseInt("01111000", 2), // 15th
+					(byte) Integer.parseInt("10001010", 2), // 16th
 			};
 	byte[] tmp;
 
