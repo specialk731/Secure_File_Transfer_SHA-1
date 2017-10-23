@@ -82,7 +82,16 @@ class Server_Thread extends Thread {
 				Files.write(f.toPath(), FileBytes);
 
 			} else {	//Client wants a file
-				System.out.println("Havent done Retrieve");
+				fileName = ois.readUTF();
+				f = new File(fileName);
+				FileBytes = Files.readAllBytes(f.toPath());
+				tmp = new byte[FileBytes.length];
+				for(int i = 0; i < FileBytes.length; i++) {
+					tmp[i] = (byte) (FileBytes[i] ^ key[i % 16]);
+				}
+				oos.writeObject(tmp);
+				oos.flush();
+
 			}
 			/*
 			tmp = (byte[]) ois.readObject();

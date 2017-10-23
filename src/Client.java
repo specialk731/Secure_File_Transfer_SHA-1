@@ -25,6 +25,7 @@ public class Client {
 		Socket sock;
 		ObjectInputStream ois;
 		ObjectOutputStream oos;
+		String ServerIP = args[1], ServerPort = args[2], FileName = args[3];
 		File f;
 		byte[] key = {	(byte) Integer.parseInt("11001101", 2), // 1st 8 bits of key
 						(byte) Integer.parseInt("01111001", 2), // 2nd 8 bits of key
@@ -46,13 +47,13 @@ public class Client {
 		byte[] tmp, fileBytes;
 		
 		try {
-			sock = new Socket(args[1], Integer.parseInt(args[2]));
+			sock = new Socket(ServerIP, Integer.parseInt(ServerPort));
 			ois = new ObjectInputStream(sock.getInputStream());
 			oos = new ObjectOutputStream(sock.getOutputStream());
 			
 			if(sending) { 
 				oos.writeByte(1 ^ key[0]); 							//Alert the Server we are sending by sending a 1 XOR with key[0]
-				f = new File(args[3]);								//Get the file
+				f = new File(FileName);								//Get the file
 				oos.writeUTF(f.getName());							//Send file name
 				fileBytes = Files.readAllBytes(f.toPath());			//Convert to Bytes
 				tmp = new byte[fileBytes.length];					//Init the array to send
@@ -62,7 +63,19 @@ public class Client {
 				oos.writeObject(tmp);								//Send tmp to server
 				oos.flush();
 			} else {
-				System.out.println("havent done R yet");
+				oos.writeByte(0 ^ key[0]);							//Alert the Server we want a file by sending a 0 XOR with key[0]
+				oos.writeUTF(FileName);								//Send the Server the filename we want
+				oos.flush();
+				tmp = (byte[]) ois.readObject();					//Wait for the Server to give us the file bytes
+				fileBytes = new byte[tmp.length];
+				for(int i = 0; i < tmp.length; i++) {
+					fileBytes[i] = (byte) (tmp[i] ^ key[i % 16]);
+				}
+				f = new File(FileName);
+				if(f.exists())
+					f.delete();
+				Files.write(f.toPath(), fileBytes);
+				
 			}
 			
 			/*
