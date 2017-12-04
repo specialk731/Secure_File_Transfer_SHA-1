@@ -11,6 +11,8 @@ import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.Arrays;
+
 import sun.misc.BASE64Decoder;
 
 public class Client {
@@ -110,12 +112,13 @@ public class Client {
 			//do one-way authenticated Diffie-Hellman
 
 			if (sending) {
+				System.out.println("Sending File: " + FileName);
+
 				f = new File(FileName);                                         //Get the file
 
 				oos.writeByte((byte) 1);                                        //Alert the Server we are sending, by sending a 1 first
 
 				byte[] fileName = FileName.getBytes("UTF-8");                   //Convert FileName to byte[]
-
 				byte[] sendingFileName = new byte[fileName.length];
 				for (int i = 0; i < fileName.length; i++) {			//for each byte in the filename
 					sendingFileName[i] = (byte) (fileName[i] ^ key[i % 16]);	//filename byte XOR with key goes into sendingFileName
@@ -124,6 +127,9 @@ public class Client {
 				oos.flush();
 
 				md = MessageDigest.getInstance("SHA-1");                        //send filename digest
+				//System.out.println("sendFileName " + Arrays.toString(sendingFileName) + " Length: " + sendingFileName.length);
+				//System.out.println("Digest " + Arrays.toString(md.digest(sendingFileName)) + " - Length: " + md.digest(sendingFileName).length);
+				md.reset();
 				oos.writeObject(md.digest(sendingFileName));
 				oos.flush();
 

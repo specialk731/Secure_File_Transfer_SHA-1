@@ -7,6 +7,7 @@ import java.net.*;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.security.MessageDigest;
+import java.util.Arrays;
 
 public class Server extends Thread {
 
@@ -57,8 +58,8 @@ class Server_Thread extends Thread {
 			(byte) Integer.parseInt("01111000", 2), // 15th
 			(byte) Integer.parseInt("10001010", 2), // 16th
 	};  //testing key only. replace with one way authenticated Diffie-Hellman generated key
-	byte[] tmp, certificate, FileName, FileBytes;
-	MessageDigest md = null;
+	byte[] tmp, EncryptedFileNameBytes, HashedEncryptedFileNameBytes, EncryptedFileBytes, HashedEncryptedFileBytes, certificate, FileName, FileBytes, digested;
+	MessageDigest md = null, tmpmd = null;
 
 	public Server_Thread(Socket s) {
 		sock = s;
@@ -76,21 +77,35 @@ class Server_Thread extends Thread {
 			//do one-way authenticated Diffie-Hellman
 			if (ois.readByte() == 1) {	//Client wants to send us a file
 
-				tmp = (byte[]) ois.readObject();                                //Get the encrypted filename bytes
+				//tmp = new byte[FileNameSize];
+				EncryptedFileNameBytes = (byte[])ois.readObject();                  //Get the encrypted filename bytes
+
 
 				md = MessageDigest.getInstance("SHA-1");                        //check filename digest
-				if(ois.readObject() != md.digest(tmp))
-				{
-					System.out.println("Filename Altered");
+
+				HashedEncryptedFileNameBytes = (byte[]) ois.readObject();		//Get Hashed Encrypted FileName Bytes
+				digested = md.digest(EncryptedFileNameBytes);
+				//System.out.println("EncryptedFileNameBytes: " + Arrays.toString(EncryptedFileNameBytes) + " Length: " + EncryptedFileNameBytes.length);
+				//System.out.println("HashedEncryptedFileNameBytes: " + Arrays.toString(HashedEncryptedFileNameBytes) + " Length: " + HashedEncryptedFileNameBytes.length);
+				//System.out.println("Digest: " + Arrays.toString(digested) + " Length: " + digested.length);
+				if(!Arrays.equals(HashedEncryptedFileNameBytes, digested)) {
+					System.out.print("Filename Altered to ");
+					FileName = new byte[EncryptedFileNameBytes.length];
+					for (int i = 0; i < EncryptedFileNameBytes.length; i++) {
+						FileName[i] = (byte) (EncryptedFileNameBytes[i] ^ key[i % 16]);                //unencrypt filename bytes
+					}
+					System.out.println(new String(FileName,"UTF-8"));
 					return;
 				}
 
-				FileName = new byte[tmp.length];
-				for (int i = 0; i < tmp.length; i++) {
-					FileName[i] = (byte) (tmp[i] ^ key[i % 16]);                //unencrypt filename bytes
+				FileName = new byte[EncryptedFileNameBytes.length];
+				for (int i = 0; i < EncryptedFileNameBytes.length; i++) {
+					FileName[i] = (byte) (EncryptedFileNameBytes[i] ^ key[i % 16]);                //unencrypt filename bytes
 				}
 
 				String fileName = new String(FileName, "UTF-8");                //convert bytes back to UTF-8
+
+				System.out.println("Got FileName: " + fileName + " intact");
 
 				f = new File(fileName);
 				if (f.exists()) //Delete it, if it exists
@@ -98,19 +113,21 @@ class Server_Thread extends Thread {
 					f.delete();
 				}
 
-				tmp = (byte[]) ois.readObject();                                //Get the files Encrypted bytes
+				EncryptedFileBytes = (byte[]) ois.readObject();                                //Get the files Encrypted bytes
 
+				HashedEncryptedFileBytes = (byte[]) ois.readObject();
 				md = MessageDigest.getInstance("SHA-1");                        //check file digest
-				if(ois.readObject() != md.digest(tmp))
-				{
+				if(!Arrays.equals( HashedEncryptedFileBytes, md.digest(EncryptedFileBytes))) {
 					System.out.println("File Altered");
 					return;
 				}
 
-				FileBytes = new byte[tmp.length];
+				System.out.println("Got File Intact");
 
-				for (int i = 0; i < tmp.length; i++) {
-					FileBytes[i] = (byte) (tmp[i] ^ key[i % 16]);               //decrypt file bytes
+				FileBytes = new byte[EncryptedFileBytes.length];
+
+				for (int i = 0; i < EncryptedFileBytes.length; i++) {
+					FileBytes[i] = (byte) (EncryptedFileBytes[i] ^ key[i % 16]);               //decrypt file bytes
 				}
 
 				Files.write(f.toPath(), FileBytes);                             //save file
