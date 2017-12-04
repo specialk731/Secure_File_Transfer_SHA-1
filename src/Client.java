@@ -25,11 +25,12 @@ public class Client {
 			return;
 		}
 
-		Boolean windows = true, sending = true;
-		if (args[0].contains("l") || args[0].contains("L")) {
-			windows = false;
+		Boolean windows = false, sending = true;
+		if (args[0].contains("w") || args[0].contains("W")) { 	//Assuming we are on a Linux environment. If not then change file paths
+			windows = true;
 		}
-		if (args[0].contains("r") || args[0].contains("R")) {
+
+		if (args[0].contains("r") || args[0].contains("R")) {	//Assume we are sending a file. If ARGS contains an r or R we are Receiving
 			sending = false;
 		}
 
@@ -57,18 +58,18 @@ public class Client {
 				(byte) Integer.parseInt("10001010", 2), // 16th
 		};     //testing key only. replace with one way authenticated Diffie-Hellman generated key
 
-		byte[] tmp, certificate, fileBytes;
-		MessageDigest md = null;
+		byte[] certificate, fileBytes;
+		MessageDigest md;
 
-		KeyFactory kf = null;
-		File keyFile = null;
+		KeyFactory kf;
+		File keyFile;
 		byte[] data;
-		PublicKey certPubKey = null;
+		PublicKey certPubKey;
 
-		CertificateFactory cf = null;
-		File certificateFile = null;
-		InputStream is = null;
-		Certificate generatedCertificate = null;
+		CertificateFactory cf;
+		File certificateFile;
+		InputStream is;
+		Certificate generatedCertificate;
 
 		PublicKey servPubKey = null;
 
@@ -77,9 +78,9 @@ public class Client {
 			ois = new ObjectInputStream(sock.getInputStream());
 			oos = new ObjectOutputStream(sock.getOutputStream());
 
-			cf = CertificateFactory.getInstance("X.509");                       //certificate will be in X.509 format
+			cf = CertificateFactory.getInstance("X.509");                       		//certificate will be in X.509 format
 
-			certificate = (byte[]) ois.readObject();				//Wait for the Server to give us the certificate file bytes
+			certificate = (byte[]) ois.readObject();									//Wait for the Server to give us the certificate file bytes
 			f = new File("CA-certificate.crt");
 			if (f.exists()) {
 				f.delete();
@@ -88,7 +89,7 @@ public class Client {
 
 			certificateFile = new File("CA-certificate.crt");
 			is = new FileInputStream(certificateFile);
-			generatedCertificate = cf.generateCertificate(is);                  //might be able to skip saving certificate as a file by generating straight from ois.
+			generatedCertificate = cf.generateCertificate(is);                  		//might be able to skip saving certificate as a file by generating straight from ois.
 
 			kf = KeyFactory.getInstance("RSA");
 
@@ -107,93 +108,83 @@ public class Client {
 
 			generatedCertificate.verify(certPubKey);
 
-			servPubKey = generatedCertificate.getPublicKey();                   //Now have server's public key for use in one-way authenticated Diffie-Hellman
+			servPubKey = generatedCertificate.getPublicKey();                   		//Now have server's public key for use in one-way authenticated Diffie-Hellman
 
 			//do one-way authenticated Diffie-Hellman
 
+			byte[] FileNameBytes = FileName.getBytes("UTF-8");       		//Convert FileName to byte[]
+
 			if (sending) {
+				byte [] sendingFileName, EncryptedFileBytes;
 				System.out.println("Sending File: " + FileName);
 
-				f = new File(FileName);                                         //Get the file
+				f = new File(FileName);                                         		//Get the file
 
-				oos.writeByte((byte) 1);                                        //Alert the Server we are sending, by sending a 1 first
+				oos.writeByte((byte) 1);                                        		//Alert the Server we are sending, by sending a 1 first
 
-				byte[] fileName = FileName.getBytes("UTF-8");                   //Convert FileName to byte[]
-				byte[] sendingFileName = new byte[fileName.length];
-				for (int i = 0; i < fileName.length; i++) {			//for each byte in the filename
-					sendingFileName[i] = (byte) (fileName[i] ^ key[i % 16]);	//filename byte XOR with key goes into sendingFileName
+				sendingFileName = new byte[FileNameBytes.length];
+				for (int i = 0; i < FileNameBytes.length; i++) {						//for each byte in the filename
+					sendingFileName[i] = (byte) (FileNameBytes[i] ^ key[i % 16]);		//filename byte XOR with key goes into sendingFileName
 				}
-				oos.writeObject(sendingFileName);                               //Send file name to the server
+				oos.writeObject(sendingFileName);                               		//Send file name to the server
 				oos.flush();
 
-				md = MessageDigest.getInstance("SHA-1");                        //send filename digest
-				//System.out.println("sendFileName " + Arrays.toString(sendingFileName) + " Length: " + sendingFileName.length);
-				//System.out.println("Digest " + Arrays.toString(md.digest(sendingFileName)) + " - Length: " + md.digest(sendingFileName).length);
+				md = MessageDigest.getInstance("SHA-1");                        		//send filename digest
 				md.reset();
 				oos.writeObject(md.digest(sendingFileName));
 				oos.flush();
 
-				fileBytes = Files.readAllBytes(f.toPath());			//Convert file contents to Bytes
-				tmp = new byte[fileBytes.length];				//Init the array to send
-				for (int i = 0; i < fileBytes.length; i++) {			//for each byte in the file
-					tmp[i] = (byte) (fileBytes[i] ^ key[i % 16]);               //file byte XOR with key goes into tmp
+				fileBytes = Files.readAllBytes(f.toPath());								//Convert file contents to Bytes
+				EncryptedFileBytes = new byte[fileBytes.length];										//Init the array to send
+				for (int i = 0; i < fileBytes.length; i++) {							//for each byte in the file
+					EncryptedFileBytes[i] = (byte) (fileBytes[i] ^ key[i % 16]);        //file byte XOR with key goes into tmp
 				}
-				oos.writeObject(tmp);                                           //Send the file
+				oos.writeObject(EncryptedFileBytes);                                    //Send the file
 				oos.flush();
 
-				md = MessageDigest.getInstance("SHA-1");                        //send file digest
-				oos.writeObject(md.digest(tmp));
+				md = MessageDigest.getInstance("SHA-1");                        		//send file digest
+				oos.writeObject(md.digest(EncryptedFileBytes));
 				oos.flush();
 			} else {
-				oos.writeByte((byte) 0);                                        //Alert the Server we want a file by sending a 0 first
+				byte[] EncryptedReceivingFileName, EncryptedFileBytes;
+				System.out.println("Requesting file: " + FileName);
 
-				byte[] fileName = FileName.getBytes("UTF-8");                   //Convert FileName to byte[]
-				byte[] sendingFileName = new byte[fileName.length];
+				oos.writeByte((byte) 0);                                        		//Alert the Server we want a file by sending a 0 first
 
-				for (int i = 0; i < fileName.length; i++) {			//for each byte in the filename
-					sendingFileName[i] = (byte) (fileName[i] ^ key[i % 16]);	//filename byte XOR with key goes into sendingFileName
+				EncryptedReceivingFileName = new byte[FileNameBytes.length];
+
+				for (int i = 0; i < FileNameBytes.length; i++) {								//for each byte in the filename
+					EncryptedReceivingFileName[i] = (byte) (FileNameBytes[i] ^ key[i % 16]);	//filename byte XOR with key goes into sendingFileName
 				}
-				oos.writeObject(sendingFileName);                               //Send file name to the server
+
+				oos.writeObject(EncryptedReceivingFileName);                            //Send file name to the server
 				oos.flush();
 
-				md = MessageDigest.getInstance("SHA-1");                        //send filename digest
-				oos.writeObject(md.digest(sendingFileName));
+				md = MessageDigest.getInstance("SHA-1");                        		//send filename digest
+				oos.writeObject(md.digest(EncryptedReceivingFileName));
 				oos.flush();
 
+				EncryptedFileBytes = (byte[]) ois.readObject();							//Wait for the Server to give us the file bytes
 
-				tmp = (byte[]) ois.readObject();				//Wait for the Server to give us the file bytes
-
-				md = MessageDigest.getInstance("SHA-1");                        //check file digest
-				if(ois.readObject() != md.digest(tmp))
-				{
+				md = MessageDigest.getInstance("SHA-1");                        		//check file digest
+				if(!Arrays.equals((byte[])ois.readObject(), md.digest(EncryptedFileBytes))){
 					System.out.println("File Altered");
 					return;
 				}
 
-				fileBytes = new byte[tmp.length];
-				for (int i = 0; i < tmp.length; i++) {
-					fileBytes[i] = (byte) (tmp[i] ^ key[i % 16]);               //decrypt bytes
+				fileBytes = new byte[EncryptedFileBytes.length];
+				for (int i = 0; i < EncryptedFileBytes.length; i++) {
+					fileBytes[i] = (byte) (EncryptedFileBytes[i] ^ key[i % 16]);        //decrypt bytes
 				}
+
 				f = new File(FileName);
 				if (f.exists()) {
 					f.delete();
 				}
-				Files.write(f.toPath(), fileBytes);                             //save file
+				Files.write(f.toPath(), fileBytes);                             		//save file
 
 			}
 
-            /*
-			tmp = new byte[args[2].length()];
-
-			for(int i = 0; i < args[2].length(); i++) {
-				tmp[i] = (byte) (args[2].charAt(i) ^ key[i % 16]);
-			}
-
-			oos.writeObject(tmp);
-			oos.flush();
-
-			System.out.println("Wrote " + args[2]);
-             */
 			oos.close();
 			ois.close();
 			sock.close();
