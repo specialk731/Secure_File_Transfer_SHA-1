@@ -8,12 +8,15 @@ import java.nio.file.Files;
 import java.security.KeyFactory;
 import java.security.MessageDigest;
 import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
 
 import sun.misc.BASE64Decoder;
+
+import javax.crypto.Cipher;
 
 public class Client {
 
@@ -39,25 +42,6 @@ public class Client {
 		ObjectOutputStream oos;
 		String ServerIP = args[1], ServerPort = args[2], FileName = args[3];
 		File f;
-
-		byte[] key = {(byte) Integer.parseInt("11001101", 2), // 1st 8 bits of key
-				(byte) Integer.parseInt("01111001", 2), // 2nd 8 bits of key
-				(byte) Integer.parseInt("00001010", 2), // 3rd
-				(byte) Integer.parseInt("01000100", 2), // 4th
-				(byte) Integer.parseInt("10001110", 2), // 5th
-				(byte) Integer.parseInt("10001111", 2), // 6th
-				(byte) Integer.parseInt("11110010", 2), // 7th
-				(byte) Integer.parseInt("01101101", 2), // 8th
-				(byte) Integer.parseInt("01010010", 2), // 9th
-				(byte) Integer.parseInt("00001011", 2), // 10th
-				(byte) Integer.parseInt("11110011", 2), // 11th
-				(byte) Integer.parseInt("00111111", 2), // 12th
-				(byte) Integer.parseInt("11001111", 2), // 13th
-				(byte) Integer.parseInt("01000001", 2), // 14th
-				(byte) Integer.parseInt("01111000", 2), // 15th
-				(byte) Integer.parseInt("10001010", 2), // 16th
-		};     //testing key only. replace with one way authenticated Diffie-Hellman generated key
-
 		byte[] certificate, fileBytes;
 		MessageDigest md;
 
@@ -81,19 +65,21 @@ public class Client {
 			cf = CertificateFactory.getInstance("X.509");                       		//certificate will be in X.509 format
 
 			certificate = (byte[]) ois.readObject();									//Wait for the Server to give us the certificate file bytes
-			f = new File("CA-certificate.crt");
+			f = new File("server-certificate.crt");
 			if (f.exists()) {
 				f.delete();
 			}
-			Files.write(f.toPath(), certificate);
+			Files.write(f.toPath(), certificate);										//Save the cert from the server
 
-			certificateFile = new File("CA-certificate.crt");
+			System.out.println("Got server-certificate.crt from the Server");
+
+			certificateFile = new File("server-certificate.crt");
 			is = new FileInputStream(certificateFile);
-			generatedCertificate = cf.generateCertificate(is);                  		//might be able to skip saving certificate as a file by generating straight from ois.
+			generatedCertificate = cf.generateCertificate(is);                  		//Generates server pub key from server cert//might be able to skip saving certificate as a file by generating straight from ois.
 
 			kf = KeyFactory.getInstance("RSA");
 
-			keyFile = new File("ashkan-public.key");
+			keyFile = new File("ashkan-public.key");							//Get CA public key from file
 			data = Files.readAllBytes(keyFile.toPath());
 
 			String temp = new String(data);
@@ -104,13 +90,26 @@ public class Client {
 			byte[] decoded = b64.decodeBuffer(publicKeyPEM);
 
 			X509EncodedKeySpec keySpec = new X509EncodedKeySpec(decoded);
-			certPubKey = kf.generatePublic(keySpec);
+			certPubKey = kf.generatePublic(keySpec);									//Use CA public key (decoded) to generate public key from server-certificate.crt
 
-			generatedCertificate.verify(certPubKey);
+			System.out.println("Got Server Public Key from serer-certificate.crt");
+
+			generatedCertificate.verify(certPubKey);									//Use the CA public key to certify that CA created server-certificate.crt
+
+			System.out.println("Validated the Server Public Key using CA public key on server-certificat.crt");
 
 			servPubKey = generatedCertificate.getPublicKey();                   		//Now have server's public key for use in one-way authenticated Diffie-Hellman
 
 			//do one-way authenticated Diffie-Hellman
+
+			byte[] key = new byte[16];
+			SecureRandom.getInstanceStrong().nextBytes(key);							//Generate a random 16 byte key
+
+			Cipher cipher = Cipher.getInstance("RSA");									//Setup cipher to encrypt key
+			cipher.init(Cipher.ENCRYPT_MODE, servPubKey);								//Set cipher to encrypt mode
+			oos.writeObject(cipher.doFinal(key));										//Encrypt key and write it to the server
+
+			System.out.println("Sent encrypted key to Server");
 
 			byte[] FileNameBytes = FileName.getBytes("UTF-8");       		//Convert FileName to byte[]
 
