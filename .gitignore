@@ -6,3 +6,4 @@
 *.classpath
 *.project
 *test*
+*.DS_Store
